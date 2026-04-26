@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アラーム</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.25em;
+      color: #a0a0c0;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    /* 現在時刻 */
+    .clock {
+      font-size: 5rem;
+      font-weight: 200;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+
+    .clock.firing {
+      color: #e94560;
+      animation: pulse 0.6s infinite alternate;
+    }
+
+    .clock-date {
+      font-size: 0.85rem;
+      color: #a0a0c0;
+      margin-top: 8px;
+      margin-bottom: 36px;
+      letter-spacing: 0.05em;
+    }
+
+    /* 追加フォーム */
+    .add-alarm {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .add-alarm-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    input[type="time"] {
+      background: #0f172a;
+      border: 1px solid #444;
+      border-radius: 10px;
+      color: #eee;
+      font-size: 1.5rem;
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      padding: 8px 12px;
+      width: 150px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+    }
+
+    input[type="time"]:focus {
+      outline: none;
+      border-color: #e94560;
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+    }
+
+    input[type="text"] {
+      background: #0f172a;
+      border: 1px solid #444;
+      border-radius: 10px;
+      color: #eee;
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      flex: 1;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]::placeholder { color: #555; }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #e94560;
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+    }
+
+    .btn-add {
+      width: 100%;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-add:hover { background: #c73652; }
+    .btn-add:active { transform: scale(0.98); }
+
+    /* アラーム一覧 */
+    .alarm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .empty-state {
+      color: #444;
+      font-size: 0.9rem;
+      padding: 32px 0;
+      display: none;
+    }
+
+    .alarm-item {
+      background: #16213e;
+      border-radius: 14px;
+      padding: 16px 20px;
+      border-left: 3px solid #333;
+      transition: border-color 0.2s, opacity 0.2s;
+      text-align: left;
+    }
+
+    .alarm-item.enabled { border-left-color: #e94560; }
+
+    .alarm-item.firing {
+      border-left-color: #e94560;
+      animation: pulse 0.6s infinite alternate;
+    }
+
+    .alarm-item.disabled { opacity: 0.5; }
+
+    .alarm-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .alarm-info {}
+
+    .alarm-time {
+      font-size: 2rem;
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .alarm-label {
+      font-size: 0.8rem;
+      color: #a0a0c0;
+      margin-top: 4px;
+    }
+
+    .alarm-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* トグルスイッチ */
+    .toggle { position: relative; display: inline-block; }
+    .toggle input { display: none; }
+
+    .toggle-track {
+      display: block;
+      width: 42px;
+      height: 24px;
+      background: #333;
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #aaa;
+      top: 3px;
+      left: 3px;
+      transition: left 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track {
+      background: rgba(233, 69, 96, 0.3);
+    }
+
+    .toggle input:checked + .toggle-track::after {
+      left: 21px;
+      background: #e94560;
+    }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: #444;
+      font-size: 1.3rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 4px;
+      transition: color 0.2s;
+      border-radius: 4px;
+    }
+
+    .delete-btn:hover { color: #e94560; }
+
+    /* 発火時の停止ボタン */
+    .dismiss-wrap {
+      margin-top: 12px;
+    }
+
+    .dismiss-btn {
+      width: 100%;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      padding: 10px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.2s;
+    }
+
+    .dismiss-btn:hover { background: #c73652; }
+
+    @keyframes pulse {
+      from { opacity: 1; }
+      to { opacity: 0.4; }
+    }
+
+    @media (max-width: 400px) {
+      .clock { font-size: 3.8rem; }
+      .add-alarm-row { flex-wrap: wrap; }
+      input[type="time"] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>アラーム</h1>
+
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="clock-date" id="clock-date"></div>
+
+    <div class="add-alarm">
+      <div class="add-alarm-row">
+        <input type="time" id="alarm-time-input">
+        <input type="text" id="alarm-label-input" placeholder="ラベル（任意）" maxlength="20">
+      </div>
+      <button class="btn-add" onclick="addAlarm()">＋ アラームを追加</button>
+    </div>
+
+    <div class="alarm-list" id="alarm-list"></div>
+    <div class="empty-state" id="empty-state">アラームがありません</div>
+  </div>
+
+  <script>
+    let alarms = [];
+    let nextId = 0;
+    let firingId = null;
+    let firingInterval = null;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatTime(d) {
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function formatDate(d) {
+      const days = ['日','月','火','水','木','金','土'];
+      return `${d.getFullYear()}年${pad(d.getMonth()+1)}月${pad(d.getDate())}日（${days[d.getDay()]}）`;
+    }
+
+    function playAlarmSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [[0, 880], [0.22, 988], [0.44, 880]].forEach(([delay, freq]) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.35, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.2);
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + 0.2);
+        });
+      } catch(e) {}
+    }
+
+    function checkAlarms(now) {
+      if (firingId !== null) return;
+      const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const today = now.toDateString();
+      for (const alarm of alarms) {
+        if (alarm.enabled && alarm.time === hhmm && alarm.lastFired !== today) {
+          alarm.lastFired = today;
+          triggerAlarm(alarm.id);
+          break;
+        }
+      }
+    }
+
+    function triggerAlarm(id) {
+      firingId = id;
+      playAlarmSound();
+      firingInterval = setInterval(playAlarmSound, 2000);
+      document.getElementById('clock').classList.add('firing');
+      renderAlarms();
+    }
+
+    function dismissAlarm() {
+      clearInterval(firingInterval);
+      firingInterval = null;
+      firingId = null;
+      document.getElementById('clock').classList.remove('firing');
+      renderAlarms();
+    }
+
+    function startClock() {
+      function tick() {
+        const now = new Date();
+        document.getElementById('clock').textContent = formatTime(now);
+        document.getElementById('clock-date').textContent = formatDate(now);
+        checkAlarms(now);
+      }
+      tick();
+      setInterval(tick, 500);
+    }
+
+    function addAlarm() {
+      const timeVal = document.getElementById('alarm-time-input').value;
+      if (!timeVal) return;
+      const label = document.getElementById('alarm-label-input').value.trim();
+      alarms.push({ id: nextId++, time: timeVal, label, enabled: true, lastFired: null });
+      alarms.sort((a, b) => a.time.localeCompare(b.time));
+      document.getElementById('alarm-label-input').value = '';
+      renderAlarms();
+    }
+
+    function deleteAlarm(id) {
+      if (firingId === id) dismissAlarm();
+      alarms = alarms.filter(a => a.id !== id);
+      renderAlarms();
+    }
+
+    function toggleAlarm(id) {
+      const alarm = alarms.find(a => a.id === id);
+      if (!alarm) return;
+      alarm.enabled = !alarm.enabled;
+      if (!alarm.enabled && firingId === id) dismissAlarm();
+      renderAlarms();
+    }
+
+    function renderAlarms() {
+      const list = document.getElementById('alarm-list');
+      const empty = document.getElementById('empty-state');
+      empty.style.display = alarms.length === 0 ? 'block' : 'none';
+
+      list.innerHTML = alarms.map(a => {
+        const isFiring = firingId === a.id;
+        const classes = ['alarm-item', a.enabled ? 'enabled' : 'disabled', isFiring ? 'firing' : ''].filter(Boolean).join(' ');
+        return `
+          <div class="${classes}">
+            <div class="alarm-main">
+              <div class="alarm-info">
+                <div class="alarm-time">${a.time}</div>
+                ${a.label ? `<div class="alarm-label">${a.label}</div>` : ''}
+              </div>
+              <div class="alarm-controls">
+                <label class="toggle">
+                  <input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="toggleAlarm(${a.id})">
+                  <span class="toggle-track"></span>
+                </label>
+                <button class="delete-btn" onclick="deleteAlarm(${a.id})">×</button>
+              </div>
+            </div>
+            ${isFiring ? `<div class="dismiss-wrap"><button class="dismiss-btn" onclick="dismissAlarm()">アラームを止める</button></div>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    // Enter キーで追加
+    document.getElementById('alarm-label-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addAlarm();
+    });
+
+    startClock();
+    renderAlarms();
+  </script>
+</body>
+</html>
